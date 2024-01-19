@@ -1,5 +1,5 @@
 baseURL = "/"
-title = "xxx学习笔记"
+title = "DurableTask学习笔记"
 
 # Language settings
 contentDir = "content"
@@ -59,8 +59,8 @@ languageName ="中文"
 # Weight used for sorting.
 weight = 1
 [languages.zh-cn.params]
-title = "xxx学习笔记"
-description = "xxx学习笔记，记录学习xxx的过程和相关资料"
+title = "DurableTask学习笔记"
+description = "DurableTask学习笔记，记录学习DurableTask的过程和相关资料"
 contentDir = "content"
 time_format_default = "2006.01.02"
 time_format_blog = "2006.01.02"
@@ -106,12 +106,12 @@ version = "0.0"
 
 # A link to latest version of the docs. Used in the "version-banner" partial to
 # point people to the main doc site.
-url_latest_version = "https://skyao.io/learning-xxx"
+url_latest_version = "https://skyao.io/learning-durabletask"
 
 # Repository configuration (URLs for in-page links to opening issues and suggesting changes)
-github_repo = "https://github.com/skyao/learning-xxx"
+github_repo = "https://github.com/skyao/learning-durabletask"
 # An optional link to a related project repo. For example, the sibling repository where your product code lives.
-github_project_repo = "https://github.com/skyao/learning-xxx"
+github_project_repo = "https://github.com/skyao/learning-durabletask"
 
 # Specify a value here if your content directory is not in your repo's root directory
 # github_subdir = ""
@@ -121,7 +121,7 @@ github_project_repo = "https://github.com/skyao/learning-xxx"
 github_branch= "main"
 
 # Google Custom Search Engine ID. Remove or comment out to disable search.
-gcs_engine_id = "d3c56aefaae284df1"
+gcs_engine_id = "74e7a29cdc3034367"
 # enable google analytics
 [services.googleAnalytics]
   id = "G-4BVWTNS4MB"
