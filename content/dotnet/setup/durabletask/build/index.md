@@ -7,6 +7,13 @@ description: >
   构建 Durable Task 项目
 ---
 
+##  获取源码
+
+```bash
+cd ~/work/code/durabletask
+git clone git@github.com:Azure/durabletask.git
+```
+
 
 
 ## 执行 build
@@ -16,6 +23,7 @@ description: >
 在终端执行命令：
 
 ```bash
+$ cd ~/work/code/durabletask/durabletask
 dotnet build
 ```
 

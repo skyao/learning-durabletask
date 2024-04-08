@@ -11,7 +11,9 @@ description: >
 
 ###  .NET 6.0 SDK 
 
-https://dotnet.microsoft.com/en-us/download/dotnet/6.0
+https://dotnet.microsoft.com/en-us/download/dotnet/6.0 
+
+下载到 dotnet-sdk-6.0.420-win-x64.exe ，执行安装
 
 下载安装 .NET 6.0 SDK 
 
@@ -62,7 +64,7 @@ PATH 中增加了两个路径：
 
 ### .NET Core 3.1 Runtime
 
-还必须安装这个 runtime，虽然已经被标注为 此版本已过期：
+还必须安装这个 3.1 runtime，虽然已经被标注为 此版本已过期：
 
 ```bash
 Testhost process for source(s) 'C:\Users\sky\work\code\durabletask\durabletask\Test\DurableTask.Core.Tests\bin\Debug\netcoreapp3.1\DurableTask.Core.Tests.dll' exited with error: You must install or update .NET to run this application.
@@ -85,4 +87,14 @@ https://aka.ms/dotnet-core-applaunch?framework=Microsoft.NETCore.App&framework_v
 https://aka.ms/dotnet-core-applaunch?framework=Microsoft.NETCore.App&framework_version=3.1.0&arch=x64&rid=win-x64&os=win10
 
 下载得到 dotnet-runtime-3.1.32-win-x64.exe 文件，安装即可。
+
+
+
+## .NET Core 2.1 Runtime
+
+还必须安装这个 2.1 runtime，azure-functions-durable-extension 项目需要：
+
+https://dotnet.microsoft.com/zh-cn/download/dotnet/2.1/runtime
+
+下载得到 dotnet-runtime-2.1.30-win-x64.exe 文件，安装即可。
 

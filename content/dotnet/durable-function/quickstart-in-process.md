@@ -1,10 +1,10 @@
 ---
-title: "durable functions概述"
-linkTitle: "概述"
-weight: 1
+title: "durable functions quickstart"
+linkTitle: "quickstart"
+weight: 100
 date: 2024-01-19
 description: >
-  durable functions概述
+  durable functions quickstart
 ---
 
 
@@ -175,4 +175,5 @@ dotnet add package Microsoft.Azure.WebJobs.Extensions.DurableTask --version 2.13
     <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.DurableTask" Version="2.13.1" />
   </ItemGroup>
 ```
+
 
