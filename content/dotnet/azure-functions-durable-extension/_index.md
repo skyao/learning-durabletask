@@ -1,6 +1,6 @@
 ---
 title: "azure-functions-durable-extension源码学习"
-linkTitle: "azure-functions-durable-extension源码"
+linkTitle: "azure-functions-durable-extension"
 weight: 1200
 date: 2024-01-19
 description: >

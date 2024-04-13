@@ -149,7 +149,7 @@ InvocationRequestHandlerAsync() 方法
 
 ### InvocationHandler
 
-
+ 代码在 `azure-functions-dotnet-worker` 仓库下的 `src\DotNetWorker.Grpc\Handlers\InvocationHandler.cs` :
 
 ```c#
         public async Task<InvocationResponse> InvokeAsync(InvocationRequest request)
@@ -246,7 +246,7 @@ _application 的定义类型是IFunctionsApplication ，实际实现是 `Microso
 
 ### FunctionsApplication
 
-
+` 代码在 `azure-functions-dotnet-worker` 仓库下的 src\DotNetWorker.Core\FunctionsApplication.cs`
 
 ```c#
 		public async Task InvokeFunctionAsync(FunctionContext context)
@@ -353,7 +353,7 @@ RunOrchestrationAsync() 方法的实现：
 
 ### GrpcOrchestrationRunner
 
-
+`durabletask-dotnet`  仓库下的 `\src\Worker\Grpc\GrpcOrchestrationRunner.cs`
 
 ```c#
     public static string LoadAndRun(

@@ -124,3 +124,10 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
 ```bash
 protoc --go_out=. --go-grpc_out=. -I submodules/durabletask-protobuf/protos orchestrator_service.proto
 ```
+
+### 建议
+
+由于 durabletask-go 和 durabletask-java 两个项目都需要用到 protoc 来生成 go 和 java 代码，但是他们两个用的 protoc 版本又不一样，因此最好是搭建两套不同的开发环境，分别安装各自要求的 protoc 版本。
+
+暂时我的实现是开了两个虚拟机，dev101 负责 durabletask-java ， dev102 负责 durabletask-go。
+

@@ -55,43 +55,45 @@ description: >
 [2024-04-08T09:07:04.629Z] Worker process started and initialized.
 ```
 
+## 调用堆栈
 
-
-
-
-## 其他
+### GrpcWorker
 
 
 
 ```c#
- public async Task ExecuteAsync(CancellationToken cancellation)
+        public Task StartAsync(CancellationToken token)
         {
-            while (!cancellation.IsCancellationRequested)
-            {
-                try
-                {
-                    AsyncServerStreamingCall<P.WorkItem> stream = await this.ConnectAsync(cancellation);
-                    await this.ProcessWorkItemsAsync(stream, cancellation);
-                }
-                ......
-            }
+          _workerClient = _workerClientFactory.CreateClient(this);
+          return _workerClient.StartAsync(token);
         }
 ```
 
 
 
-ConnectAsync() 方法中会调用 grpc protobuf 文件中定义的 GetWorkItems() 方法：
+
+
+### GrpcWorkerClient
+
+`src\DotNetWorker.Grpc\GrpcWorkerClientFactory.cs` 文件中的 GrpcWorkerClient
 
 ```c#
-        async Task<AsyncServerStreamingCall<P.WorkItem>> ConnectAsync(CancellationToken cancellation)
-        {
-            await this.sidecar!.HelloAsync(EmptyMessage, cancellationToken: cancellation);
-            this.Logger.EstablishedWorkItemConnection();
 
-            Console.WriteLine("********GrpcDurableTaskWorker call GetWorkItems()********");
+            public async Task StartAsync(CancellationToken token)
+            {
+                if (_running)
+                {
+                    throw new InvalidOperationException($"The client is already running. Multiple calls to {nameof(StartAsync)} are not supported.");
+                }
 
-            // Get the stream for receiving work-items
-            return this.sidecar!.GetWorkItems(new P.GetWorkItemsRequest(), cancellationToken: cancellation);
-        }
+                _running = true;
+
+                var eventStream = _grpcClient.EventStream(cancellationToken: token);
+
+                await SendStartStreamMessageAsync(eventStream.RequestStream);
+
+                _ = StartWriterAsync(eventStream.RequestStream);
+                _ = StartReaderAsync(eventStream.ResponseStream);
+            }
 ```
 
