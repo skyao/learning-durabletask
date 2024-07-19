@@ -14,7 +14,26 @@ description: >
 
 
 ```bash
-
+MyDurableFunction2.dll!Company.Function.HelloOrchestration.HttpStart(Microsoft.Azure.Functions.Worker.Http.HttpRequestData req, Microsoft.DurableTask.Client.DurableTaskClient client, Microsoft.Azure.Functions.Worker.FunctionContext executionContext) Line 49 (c:/Users/sky/work/code/durabletask-fork2/MyDurableFunction2/HelloOrchestration.cs:49)
+MyDurableFunction2.dll!MyDurableFunction2.DirectFunctionExecutor.ExecuteAsync(Microsoft.Azure.Functions.Worker.FunctionContext context) Line 40 (GeneratedFunctionExecutor.g.cs:40)
+Microsoft.Azure.Functions.Worker.Core.dll!Microsoft.Azure.Functions.Worker.Pipeline.FunctionExecutionMiddleware.Invoke(Microsoft.Azure.Functions.Worker.FunctionContext context) Line 20 (FunctionExecutionMiddleware.cs:20)
+Microsoft.Azure.Functions.Worker.Core.dll!Microsoft.Extensions.Hosting.MiddlewareWorkerApplicationBuilderExtensions.UseFunctionExecutionMiddleware.AnonymousMethod__1_2(Microsoft.Azure.Functions.Worker.FunctionContext context) Line 57 (WorkerMiddlewareWorkerApplicationBuilderExtensions.cs:57)
+Microsoft.Azure.Functions.Worker.Core.dll!Microsoft.Azure.Functions.Worker.OutputBindings.OutputBindingsMiddleware.Invoke(Microsoft.Azure.Functions.Worker.FunctionContext context, Microsoft.Azure.Functions.Worker.Middleware.FunctionExecutionDelegate next) Line 13 (OutputBindingsMiddleware.cs:13)
+Microsoft.Azure.Functions.Worker.Core.dll!Microsoft.Extensions.Hosting.MiddlewareWorkerApplicationBuilderExtensions.UseOutputBindingsMiddleware.AnonymousMethod__3(Microsoft.Azure.Functions.Worker.FunctionContext context) Line 84 (WorkerMiddlewareWorkerApplicationBuilderExtensions.cs:84)
+Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore.dll!Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore.FunctionsHttpProxyingMiddleware.Invoke(Microsoft.Azure.Functions.Worker.FunctionContext context, Microsoft.Azure.Functions.Worker.Middleware.FunctionExecutionDelegate next) Line 48 (FunctionsHttpProxyingMiddleware.cs:48)
+[Resuming Async Method] (Unknown Source:0)
+System.Private.CoreLib.dll!System.Runtime.CompilerServices.AsyncTaskMethodBuilder<System.Threading.Tasks.VoidTaskResult>.AsyncStateMachineBox<Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore.FunctionsHttpProxyingMiddleware.<Invoke>d__4>.ExecutionContextCallback(object s) (Unknown Source:0)
+System.Private.CoreLib.dll!System.Threading.ExecutionContext.RunInternal(System.Threading.ExecutionContext executionContext, System.Threading.ContextCallback callback, object state) (Unknown Source:0)
+System.Private.CoreLib.dll!System.Runtime.CompilerServices.AsyncTaskMethodBuilder<System.Threading.Tasks.VoidTaskResult>.AsyncStateMachineBox<Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore.FunctionsHttpProxyingMiddleware.<Invoke>d__4>.MoveNext(System.Threading.Thread threadPoolThread) (Unknown Source:0)
+System.Private.CoreLib.dll!System.Runtime.CompilerServices.AsyncTaskMethodBuilder<System.Threading.Tasks.VoidTaskResult>.AsyncStateMachineBox<Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore.FunctionsHttpProxyingMiddleware.<Invoke>d__4>.MoveNext() (Unknown Source:0)
+System.Private.CoreLib.dll!System.Runtime.CompilerServices.TaskAwaiter.OutputWaitEtwEvents.AnonymousMethod__12_0(System.Action innerContinuation, System.Threading.Tasks.Task innerTask) (Unknown Source:0)
+System.Private.CoreLib.dll!System.Threading.Tasks.AwaitTaskContinuation.RunOrScheduleAction(System.Action action, bool allowInlining) (Unknown Source:0)
+System.Private.CoreLib.dll!System.Threading.Tasks.Task.RunContinuations(object continuationObject) (Unknown Source:0)
+System.Private.CoreLib.dll!System.Threading.Tasks.Task<System.__Canon>.TrySetResult(System.__Canon result) (Unknown Source:0)
+System.Private.CoreLib.dll!System.Runtime.CompilerServices.AsyncTaskMethodBuilder<System.__Canon>.SetExistingTaskResult(System.Threading.Tasks.Task<System.__Canon> task, System.__Canon result) (Unknown Source:0)
+[Completed] Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore.dll!Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore.DefaultHttpCoordinator.SetFunctionContextAsync(string invocationId, Microsoft.Azure.Functions.Worker.FunctionContext context) Line 37 (DefaultHttpCoordinator.cs:37)
+System.Private.CoreLib.dll!System.Runtime.CompilerServices.AsyncTaskMethodBuilder<System.__Canon>.AsyncStateMachineBox<Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore.DefaultHttpCoordinator.<SetFunctionContextAsync>d__3>.ExecutionContextCallback(object s) (Unknown Source:0)
+System.Private.CoreLib.dll!System.Threading.ExecutionContext.RunInternal(System.Threading.ExecutionContext executionContext, System.Threading.ContextCallback callback, object state) (Unknown Source:0)
 ```
 
 
@@ -370,7 +389,14 @@ public async Task<InvocationResponse> InvokeAsync(InvocationRequest request)
         }
 ```
 
+为了支持 versioning，这里的 TaskName 需要额外传递 version 参数，因此代码更新为:
 
+```c#
+      string instanceId = await client.ScheduleNewOrchestrationInstanceAsync(
+        new TaskName(nameof(HelloOrchestration), "1.2.0"));
+```
+
+Client 的调用者可以在这里选择传递是否传递新实例的版本。
 
 ## Azure functions durable extension的代码
 
@@ -414,7 +440,7 @@ public override async Task<string> ScheduleNewOrchestrationInstanceAsync(
         {
             // 这里的 orchestratorName.Name 的值是 "HelloOrchestration"
             Name = orchestratorName.Name,
-            // 这里的 version 是一个 null
+            // 这里的 version 是一个 null,现在改为传递  orchestratorName.Version
             Version = orchestratorName.Version,
             InstanceId = options?.InstanceId ?? Guid.NewGuid().ToString("N"),
             // input 为 null
@@ -439,6 +465,8 @@ public override async Task<string> ScheduleNewOrchestrationInstanceAsync(
         return result.InstanceId;
     }
 ```
+
+主要要一路传递 version 字段。
 
 最后调用 sidecarClient 的 StartInstanceAsync() 方法发出 grpc 请求并得到返回的结果。
 
@@ -485,6 +513,315 @@ message CreateInstanceResponse {
 ```
 
 
+
+之后就是 grpc 服务器端的代码实现了。
+
+
+
+## azure-functions-durable-extension
+
+### LocalGrpcListener
+
+在 `azure-functions-durable-extension` 仓库下的 `src\WebJobs.Extensions.DurableTask\LocalGrpcListener.cs`  中。
+
+
+
+```c#
+public async override Task<P.CreateInstanceResponse> StartInstance(P.CreateInstanceRequest request, ServerCallContext context)
+            {
+                try
+                {
+                    string instanceId = await this.GetClient(context).StartNewAsync(
+                        request.Name, request.InstanceId, request.Version, Raw(request.Input));
+                    return new P.CreateInstanceResponse
+                    {
+                        InstanceId = instanceId,
+                    };
+                }
+                catch (InvalidOperationException)
+                {
+                    throw new RpcException(new Status(StatusCode.AlreadyExists, $"An Orchestration instance with the ID {request.InstanceId} already exists."));
+                }
+            }
+```
+
+this.GetClient(context) 返回的是 IDurableClient 类型，实际实现为 DurableClient 。
+
+### DurableClient
+
+在 `azure-functions-durable-extension` 仓库下的文件`src\WebJobs.Extensions.DurableTask\ContextImplementations\DurableClient.cs` 中。
+
+```c#
+async Task<string> IDurableOrchestrationClient.StartNewAsync<T>(string orchestratorFunctionName, string instanceId, string instanceVersion, T input)
+        {
+						......
+
+            OrchestrationStatus[] dedupeStatuses = this.GetStatusesNotToOverride();
+            Task<OrchestrationInstance> createTask = this.client.CreateOrchestrationInstanceAsync(
+                orchestratorFunctionName, instanceVersion, instanceId, input, null, dedupeStatuses);
+
+            this.traceHelper.FunctionScheduled(
+                this.TaskHubName,
+                orchestratorFunctionName,
+                instanceId,
+                reason: "NewInstance",
+                functionType: FunctionType.Orchestrator,
+                isReplay: false);
+
+            OrchestrationInstance instance = await createTask;
+            return instance.InstanceId;
+        }
+```
+
+> versioning： StartNewAsync() 需要增加一个 `string instanceVersion` 参数来传递 version 参数。
+
+这里的 client 是 TaskHubClient 类型
+
+
+
+## durabletask
+
+### TaskHubClient
+
+在 `durabletask` 仓库下的文件 `src\DurableTask.Core\TaskHubClient.cs` 中
+
+```c#
+        public Task<OrchestrationInstance> CreateOrchestrationInstanceAsync(string name, string version, object input)
+        {
+            return this.InternalCreateOrchestrationInstanceWithRaisedEventAsync(
+                name,
+                version,
+                orchestrationInstanceId: null,
+                input,
+                orchestrationTags: null,
+                dedupeStatuses: null,
+                eventName: null,
+                eventData: null);
+        }
+```
+
+InternalCreateOrchestrationInstanceWithRaisedEventAsync() 方法的实现：
+
+```c#
+async Task<OrchestrationInstance> InternalCreateOrchestrationInstanceWithRaisedEventAsync(
+            string orchestrationName,
+            string orchestrationVersion,
+            string orchestrationInstanceId,
+            object orchestrationInput,
+            IDictionary<string, string> orchestrationTags,
+            OrchestrationStatus[] dedupeStatuses,
+            string eventName,
+            object eventData,
+            DateTime? startAt = null)
+        {
+            TraceContextBase requestTraceContext = null;
+
+            // correlation 
+            CorrelationTraceClient.Propagate(()=> { requestTraceContext = CreateOrExtractRequestTraceContext(eventName); });
+
+            if (string.IsNullOrWhiteSpace(orchestrationInstanceId))
+            {
+                orchestrationInstanceId = Guid.NewGuid().ToString("N");
+            }
+
+            var orchestrationInstance = new OrchestrationInstance
+            {
+                InstanceId = orchestrationInstanceId,
+                ExecutionId = Guid.NewGuid().ToString("N"),
+            };
+
+            string serializedOrchestrationData = this.defaultConverter.SerializeInternal(orchestrationInput);
+            var startedEvent = new ExecutionStartedEvent(-1, serializedOrchestrationData)
+            {
+                Tags = orchestrationTags,
+                Name = orchestrationName,
+                Version = orchestrationVersion,
+                OrchestrationInstance = orchestrationInstance,
+                ScheduledStartTime = startAt
+            };
+
+            var startMessage = new TaskMessage
+            {
+                OrchestrationInstance = orchestrationInstance,
+                Event = startedEvent
+            };
+
+            this.logHelper.SchedulingOrchestration(startedEvent);
+
+            using Activity newActivity = TraceHelper.StartActivityForNewOrchestration(startedEvent);
+
+            CorrelationTraceClient.Propagate(() => CreateAndTrackDependencyTelemetry(requestTraceContext));
+
+            try
+            {
+                // Raised events and create orchestration calls use different methods so get handled separately
+                await this.ServiceClient.CreateTaskOrchestrationAsync(startMessage, dedupeStatuses);
+            }
+            catch (Exception e)
+            {
+                TraceHelper.AddErrorDetailsToSpan(newActivity, e);
+                throw;
+            }
+				
+  					......
+
+            return orchestrationInstance;
+        }
+```
+
+ExecutionStartedEvent 的 version 字段被设置为前面传递过来的 version。
+
+最后调用到
+
+```c#
+// Raised events and create orchestration calls use different methods so get handled separately
+await this.ServiceClient.CreateTaskOrchestrationAsync(startMessage, dedupeStatuses);
+```
+
+this.ServiceClient 的类型是 IOrchestrationServiceClient，实际实现是 AzureStorageDurabilityProvider
+
+## azure-functions-durable-extension
+
+### AzureStorageDurabilityProvider
+
+在 `azure-functions-durable-extension` 仓库的 `src\WebJobs.Extensions.DurableTask\AzureStorageDurabilityProvider.cs` 文件中。
+
+```c#
+    internal class AzureStorageDurabilityProvider : DurabilityProvider {}
+
+```
+
+
+
+AzureStorageDurabilityProvider 继承自 DurabilityProvider，`src\WebJobs.Extensions.DurableTask\DurabilityProvider.cs`
+
+DurabilityProvider 的 CreateTaskOrchestrationAsync() 方法的实现是：
+
+```c#
+        public Task CreateTaskOrchestrationAsync(TaskMessage creationMessage)
+        {
+            return this.GetOrchestrationServiceClient().CreateTaskOrchestrationAsync(creationMessage);
+        }
+```
+
+this.GetOrchestrationServiceClient() 返回 IOrchestrationServiceClient 类型，实际实现是 AzureStorageOrchestrationService 。
+
+### AzureStorageOrchestrationService
+
+在 `durabletask` 仓库的 `src\DurableTask.AzureStorage\AzureStorageOrchestrationService.cs` 文件中。
+
+
+
+```c#
+        public Task CreateTaskOrchestrationAsync(TaskMessage creationMessage)
+        {
+            return this.CreateTaskOrchestrationAsync(creationMessage, null);
+        }
+```
+
+
+
+```c#
+public async Task CreateTaskOrchestrationAsync(TaskMessage creationMessage, OrchestrationStatus[] dedupeStatuses)
+        {
+            ExecutionStartedEvent executionStartedEvent = creationMessage.Event as ExecutionStartedEvent;
+            if (executionStartedEvent == null)
+            {
+                throw new ArgumentException($"Only {nameof(EventType.ExecutionStarted)} messages are supported.", nameof(creationMessage));
+            }
+
+            // Client operations will auto-create the task hub if it doesn't already exist.
+            await this.EnsureTaskHubAsync();
+
+            InstanceStatus existingInstance = await this.trackingStore.FetchInstanceStatusAsync(
+                creationMessage.OrchestrationInstance.InstanceId);
+
+            if (existingInstance?.State != null && dedupeStatuses != null && dedupeStatuses.Contains(existingInstance.State.OrchestrationStatus))
+            {
+                // An instance in this state already exists.
+                if (this.settings.ThrowExceptionOnInvalidDedupeStatus)
+                {
+                    throw new OrchestrationAlreadyExistsException($"An Orchestration instance with the status {existingInstance.State.OrchestrationStatus} already exists.");
+                }
+                
+                return;
+            }
+
+            if (executionStartedEvent.Generation == null)
+            {
+                if (existingInstance != null)
+                {
+                    executionStartedEvent.Generation = existingInstance.State.Generation + 1;
+                }
+                else
+                {
+                    executionStartedEvent.Generation = 0;
+                }
+            }
+
+            ControlQueue controlQueue = await this.GetControlQueueAsync(creationMessage.OrchestrationInstance.InstanceId);
+            MessageData startMessage = await this.SendTaskOrchestrationMessageInternalAsync(
+                EmptySourceInstance,
+                controlQueue,
+                creationMessage);
+
+            string inputPayloadOverride = null;
+            if (startMessage.CompressedBlobName != null)
+            {
+                // The input of the orchestration is changed to be a URL to a compressed blob, which
+                // is the input queue message. When fetching the orchestration instance status, that
+                // blob will be downloaded, decompressed, and the ExecutionStartedEvent.Input value
+                // will be returned as the input value.
+                inputPayloadOverride = this.messageManager.GetBlobUrl(startMessage.CompressedBlobName);
+            }
+
+            await this.trackingStore.SetNewExecutionAsync(
+                executionStartedEvent,
+                existingInstance?.ETag,
+                inputPayloadOverride);
+        }
+```
+
+
+
+
+
+
+
+
+
+## 疑问
+
+TaskHubClient 的 InternalCreateOrchestrationInstanceWithRaisedEventAsync() 方法，除了通过 CreateTaskOrchestrationAsync() 方法发送 ExecutionStartedEvent 外，对于有 eventData 的情况，还需要通过 SendTaskOrchestrationMessageAsync() 方法发送 eventRaisedEvent ：
+
+```c#
+            if (eventData != null)
+            {
+                string serializedEventData = this.defaultConverter.SerializeInternal(eventData);
+                var eventRaisedEvent = new EventRaisedEvent(-1, serializedEventData) { Name = eventName };
+
+                this.logHelper.RaisingEvent(orchestrationInstance, eventRaisedEvent);
+                
+                var eventMessage = new TaskMessage
+                {
+                    OrchestrationInstance = new OrchestrationInstance
+                    {
+                        InstanceId = orchestrationInstanceId,
+
+                        // to ensure that the event gets raised on the running
+                        // orchestration instance, null the execution id
+                        // so that it will find out which execution
+                        // it should use for processing
+                        ExecutionId = null
+                    },
+                    Event = eventRaisedEvent,
+                };
+
+                await this.ServiceClient.SendTaskOrchestrationMessageAsync(eventMessage);
+            }
+```
+
+ExecutionStartedEvent 和 EventRaisedEvent 都要被包装为 TaskMessage。
 
 
 

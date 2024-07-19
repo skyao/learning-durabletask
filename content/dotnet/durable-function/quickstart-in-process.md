@@ -203,7 +203,7 @@ dotnet add package Microsoft.Azure.WebJobs.Extensions.DurableTask --version 2.13
 
 备注：
 
-- 如果启动 debug 时遇到报错，提示 func start 命令失败，请重启 vs code 再试
+- 如果启动 debug 时遇到报错，提示 `Failed to find "func: host start" task.` ，请重启 vs code 再试
 
 ### 改用 async api 并修改依赖版本
 

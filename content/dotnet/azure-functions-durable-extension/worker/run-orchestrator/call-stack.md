@@ -4,7 +4,7 @@ linkTitle: "调用堆栈"
 weight: 100
 date: 2024-01-19
 description: >
-  DurableTask client 运行 Orchestration 的调用堆栈
+  DurableTask worker 运行 Orchestration 的调用堆栈
 ---
 
 
@@ -56,6 +56,8 @@ System.Private.CoreLib.dll!System.Threading.PortableThreadPool.WorkerThread.Work
 
 ### GrpcWorkerClientFactory
 
+在 `azure-functions-dotnet-worker` 仓库的 `src\DotNetWorker.Grpc\GrpcWorkerClientFactory.cs` 文件中：
+
 ```c#
             private async Task StartReaderAsync(IAsyncStreamReader<StreamingMessage> responseStream)
             {
@@ -66,9 +68,13 @@ System.Private.CoreLib.dll!System.Threading.PortableThreadPool.WorkerThread.Work
             }
 ```
 
+这是 worker grpc 服务器端的入口。
+
 这里的 _processor 实现的 `Microsoft.Azure.Functions.Worker.GrpcWorker`
 
 ### GrpcWorker
+
+在 `azure-functions-dotnet-worker` 仓库的 `src\DotNetWorker.Grpc\GrpcWorker.cs` 文件中：
 
 grpc worker 收到 grpc 消息之后，调用 ProcessRequestCoreAsync() 方法进行处理，注意这里是异步：
 
@@ -95,7 +101,8 @@ ProcessRequestCoreAsync() 方法的实现：
             switch (request.ContentCase)
             {
                 case MsgType.InvocationRequest:
-                    // 会走到这里
+                    // 会走到这里，注意会有两次 InvocationRequest
+                    // 第一次是 HelloOrchestration_HttpStart，第二次才是 RunOrchestrator
                     responseMessage.InvocationResponse = await InvocationRequestHandlerAsync(request.InvocationRequest);
                     break;
 
@@ -246,7 +253,7 @@ _application 的定义类型是IFunctionsApplication ，实际实现是 `Microso
 
 ### FunctionsApplication
 
-` 代码在 `azure-functions-dotnet-worker` 仓库下的 src\DotNetWorker.Core\FunctionsApplication.cs`
+代码在 `azure-functions-dotnet-worker` 仓库下的 `src\DotNetWorker.Core\FunctionsApplication.cs`
 
 ```c#
 		public async Task InvokeFunctionAsync(FunctionContext context)
@@ -278,6 +285,8 @@ _functionExecutionDelegate  的实现是 `Microsoft.Azure.Functions.Worker.Middl
 
 ### MiddlewareWorkerApplicationBuilderExtensions
 
+代码在 `azure-functions-dotnet-worker` 仓库下的 `src\DotNetWorker.Core\hosting\MiddlewareWorkerApplicationBuilderExtensions.cs`
+
 ```c#
         public static IFunctionsWorkerApplicationBuilder UseMiddleware<T>(this IFunctionsWorkerApplicationBuilder builder)
             where T : class, IFunctionsWorkerMiddleware
@@ -298,13 +307,17 @@ _functionExecutionDelegate  的实现是 `Microsoft.Azure.Functions.Worker.Middl
         }
 ```
 
-这里的 middleware 实现是 DurableTaskFunctionsMiddleware
+这里的 middleware 实现是 DurableTaskFunctionsMiddleware。
+
+从这里开始，调用从 azure function dotnet worker (这是 Azure function 的代码) 进去 Azure functions durable extension （这是 Durable Function 的代码）。
+
+这之前的代码都不能动。
 
 ## Azure functions durable extension
 
 ### DurableTaskFunctionsMiddleware
 
-
+代码在 `azure-functions-durable-extension`  仓库中的 `src\Worker.Extensions.DurableTask\DurableTaskFunctionsMiddleware.cs` 文件中：
 
 ```c#
     public Task Invoke(FunctionContext functionContext, FunctionExecutionDelegate next)
@@ -347,13 +360,11 @@ RunOrchestrationAsync() 方法的实现：
     }
 ```
 
-
-
-
+## durabletask-dotnet
 
 ### GrpcOrchestrationRunner
 
-`durabletask-dotnet`  仓库下的 `\src\Worker\Grpc\GrpcOrchestrationRunner.cs`
+在 `durabletask-dotnet`  仓库下的 `\src\Worker\Grpc\GrpcOrchestrationRunner.cs`
 
 ```c#
     public static string LoadAndRun(
@@ -399,6 +410,15 @@ RunOrchestrationAsync() 方法的实现：
         return Convert.ToBase64String(responseBytes);
     }
 ```
+
+
+
+这里的 P.OrchestratorRequest request 要仔细检查，看是否设置了 version：
+
+- request.InstanceId
+- 作为 newEvent 的 ExecutionStartedEvent 的  version 字段和 OrchestrationInstance.InstanceVersion 字段
+
+
 
 ### TaskOrchestrationExecutor
 
